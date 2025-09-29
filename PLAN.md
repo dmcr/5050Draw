@@ -24,45 +24,50 @@ Selected for the following reasons:
 ## Architecture
 
 ### Sheet Structure
-The Google Sheets workbook will contain three sheets:
+The Google Sheets workbook will contain two sheets:
 
 1. **Participants Sheet**
-   - List of names eligible for the draw
+   - Columns: Email (unique), Name (unique), Paid Until (date)
+   - Email and Name enforce uniqueness via data validation
+   - Paid Until uses date picker for easy date entry
    - Editable by authorized users
+   - Changes audited via Google Sheets built-in version history
 
-2. **Audit Log Sheet**
-   - Timestamped record of every draw action
-   - Captures: timestamp, user who ran draw, participant count, winner
-   - Protected (read-only except via script)
-
-3. **Winners Sheet**
-   - Historical record of all winners
+2. **Winners Sheet**
+   - Columns: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By
+   - Serves as both winners log and audit trail for draw actions
+   - Timestamp formatted as human-readable date/time
    - Protected (read-only except via script)
 
 ### Security & Permissions
 
-- **User Identity**: Script captures `Session.getActiveUser().getEmail()` to bind each draw to the executing user
-- **Sheet Protection**: Audit Log and Winners sheets set as protected ranges (read-only for most users, writable only by script + admins)
+- **User Identity**: Script captures `Session.getActiveUser().getEmail()` to record who conducted each draw
+- **Sheet Protection**: Winners sheet set as protected range (read-only for most users, writable only by script + admins)
 - **Execution Permissions**: Only users with edit access to the spreadsheet can run the script
-- **Audit Trail**: Immutable by design - users cannot manually edit protected sheets, ensuring audit integrity
+- **Audit Trail**:
+  - Draw actions: Immutable Winners sheet records all draw results
+  - Participant changes: Google Sheets built-in version history tracks all edits automatically
+- **Data Validation**: Email and Name columns enforce uniqueness to prevent duplicate participants
 
 ### User Interface
 
 - **Custom Menu**: "50/50 Draw" menu added to spreadsheet toolbar
 - **Dialog/Sidebar**: Display draw results and confirmation
-- **Immediate Feedback**: Winner displayed to user, automatically logged to audit and winner sheets
+- **Immediate Feedback**: Winner displayed to user, automatically logged to Winners sheet
 
 ## Requirements
-- Load participant names from Participants sheet
-- Conduct cryptographically random draw
+- Load participant data (email, name, paid until date) from Participants sheet
+- Conduct cryptographically random draw from eligible participants
 - Display winner to executing user
-- Log every draw action with timestamp and user identity
-- Maintain immutable audit trail and winner history
+- Log every draw action with timestamp, winner details, participant count, and conducting user
+- Maintain immutable audit trail of draw results in Winners sheet
+- Enforce uniqueness on email and name fields
+- Validate dates with date picker for Paid Until field
 
 ## Next Steps
-1. Create Google Sheets template with three sheets
+1. Create Google Sheets template with two sheets
 2. Implement Apps Script with custom menu
 3. Implement draw logic with proper randomization
-4. Implement audit logging
+4. Implement winner logging with full audit details
 5. Set up sheet protection
 6. Testing and validation
