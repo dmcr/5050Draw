@@ -36,11 +36,12 @@
 6. **Set up date validation for "Paid Until" column:**
    - Select column C (starting from C2)
    - Go to **Data → Data validation**
-   - Criteria: "Date"
-   - Check "Show validation help text"
-   - Check "Reject input" (optional - to enforce valid dates)
-   - Check "Show date picker" (this will display a calendar selector)
+   - Criteria: "Date" then "is valid date"
+   - Check "Reject input" to enforce valid dates
+   - Optionally add validation help text: "Enter a valid date"
    - Save
+
+   **Note:** Google Sheets automatically shows a date picker (calendar icon) when you click on any cell in this column.
 
 **Example:**
 ```
@@ -83,4 +84,4 @@ After installing the Apps Script code:
 
 Once sheets are created:
 - Open **Extensions → Apps Script**
-- Implement the draw script (Step 2 of PLAN.md)
+- Copy Code.gs

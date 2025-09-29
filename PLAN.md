@@ -57,17 +57,32 @@ The Google Sheets workbook will contain two sheets:
 
 ## Requirements
 - Load participant data (email, name, paid until date) from Participants sheet
-- Conduct cryptographically random draw from eligible participants
-- Display winner to executing user
+- Filter participants to only those with Paid Until >= today
+- Conduct random draw from eligible participants using Fisher-Yates shuffle + random selection
+- Display winner to executing user via dialog
 - Log every draw action with timestamp, winner details, participant count, and conducting user
 - Maintain immutable audit trail of draw results in Winners sheet
-- Enforce uniqueness on email and name fields
+- Enforce uniqueness on email and name fields via data validation
 - Validate dates with date picker for Paid Until field
 
-## Next Steps
-1. Create Google Sheets template with two sheets
-2. Implement Apps Script with custom menu
-3. Implement draw logic with proper randomization
-4. Implement winner logging with full audit details
-5. Set up sheet protection
-6. Testing and validation
+## Implementation Details
+
+### Randomization Approach
+- **Fisher-Yates shuffle algorithm**: Eliminates position bias by shuffling eligible participants
+- **Math.random() selection**: Selects random index from shuffled array
+- **Two-layer randomization**: Provides fair selection without cryptographic overhead (appropriate for prize draws)
+
+### Code Structure (Code.gs)
+- `onOpen()`: Creates custom menu on spreadsheet open
+- `conductDraw()`: Main draw logic with eligibility filtering
+- `shuffle()`: Fisher-Yates array shuffling
+- `logWinner()`: Appends draw results to Winners sheet
+- `getParticipantsSheet()`, `getWinnersSheet()`: Helper functions with error handling
+
+## Status
+✅ 1. Google Sheets template structure defined (SETUP.md)
+✅ 2. Apps Script implemented with custom menu (Code.gs)
+✅ 3. Draw logic with Fisher-Yates shuffle randomization (Code.gs)
+✅ 4. Winner logging with full audit details (Code.gs)
+⏳ 5. Set up sheet protection (manual step after deployment)
+⏳ 6. Testing and validation (ready for testing)
