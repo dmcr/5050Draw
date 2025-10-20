@@ -73,6 +73,20 @@ A4: bob.johnson@email.com    B4: Bob Johnson       C4: 2025/03/26
    - Select column F
    - Go to **Format → Number → Date**
    - This will display the winner's "Paid Until" date at the time of the draw
+5. Set up conditional formatting for visual prize status:
+   - Select the data range **A2:I** (or A2:I1000 for a specific limit)
+   - Go to **Format → Conditional formatting**
+   - Add first rule (Green for paid up winners):
+     - Format cells if: **Custom formula is**
+     - Formula: `=$G2="Yes"`
+     - Formatting style: Choose green background (e.g., light green #d9ead3)
+     - Click **Done**
+   - Click **+ Add another rule** (Red for unpaid winners):
+     - Format cells if: **Custom formula is**
+     - Formula: `=$G2="No"`
+     - Formatting style: Choose red/pink background (e.g., light red #f4cccc)
+     - Click **Done**
+   - This will color entire rows green when prize was awarded, red when rolled over
 
 **Note:** This sheet serves as both the winners log and audit trail for all draw actions. It will be populated automatically by the script. You can leave it with just headers for now.
 
