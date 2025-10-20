@@ -213,5 +213,104 @@ function runAllTests() {
   console.log('\n' + '═'.repeat(70) + '\n');
 }
 
+/**
+ * Test for positional bias - verifies each position in the original array
+ * has equal chance of being selected, regardless of shuffle + random selection
+ */
+function testPositionalBias() {
+  console.log(`\n\n${'█'.repeat(70)}`);
+  console.log('  POSITIONAL BIAS TEST');
+  console.log('█'.repeat(70) + '\n');
+
+  console.log('This test verifies that the original position in the array does NOT');
+  console.log('affect the probability of being selected. Each position should have');
+  console.log('equal probability of winning.\n');
+
+  const participantCount = 11;
+  const numDraws = 100000; // Large sample for statistical significance
+
+  // Track wins by ORIGINAL position in array
+  const positionWinCounts = new Array(participantCount).fill(0);
+
+  // Create participants with fixed IDs that track original position
+  const participants = Array.from({ length: participantCount }, (_, i) => ({
+    id: i + 1,
+    originalPosition: i, // Track original position
+    name: `Participant ${i + 1}`
+  }));
+
+  console.log(`Running ${numDraws.toLocaleString()} draws with ${participantCount} participants...\n`);
+
+  // Run draws and track by original position
+  for (let i = 0; i < numDraws; i++) {
+    const winner = conductSimulatedDraw(participants);
+    positionWinCounts[winner.originalPosition]++;
+  }
+
+  // Calculate statistics
+  const expectedWins = numDraws / participantCount;
+  const expectedPercentage = (1 / participantCount) * 100;
+
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('RESULTS BY ORIGINAL POSITION');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  positionWinCounts.forEach((wins, position) => {
+    const percentage = (wins / numDraws) * 100;
+    const deviation = ((wins - expectedWins) / expectedWins) * 100;
+    const deviationStr = deviation >= 0 ? `+${deviation.toFixed(2)}%` : `${deviation.toFixed(2)}%`;
+
+    console.log(`Position ${(position + 1).toString().padStart(2)} (${position === 0 ? '1st' : position === 1 ? '2nd' : position === 2 ? '3rd' : (position + 1) + 'th'} in array):  ${wins.toString().padStart(6)} wins  (${percentage.toFixed(3)}%)  ${deviationStr.padStart(8)}`);
+  });
+
+  console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('STATISTICAL ANALYSIS');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  console.log(`Expected wins per position: ${expectedWins.toFixed(2)} (${expectedPercentage.toFixed(3)}%)`);
+
+  const minWins = Math.min(...positionWinCounts);
+  const maxWins = Math.max(...positionWinCounts);
+  const range = maxWins - minWins;
+
+  console.log(`Minimum wins: ${minWins}`);
+  console.log(`Maximum wins: ${maxWins}`);
+  console.log(`Range: ${range} (${((range / expectedWins) * 100).toFixed(2)}% of expected)`);
+
+  // Calculate standard deviation
+  const mean = expectedWins;
+  const squaredDiffs = positionWinCounts.map(count => Math.pow(count - mean, 2));
+  const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / positionWinCounts.length;
+  const stdDev = Math.sqrt(variance);
+
+  console.log(`Standard deviation: ${stdDev.toFixed(2)}`);
+
+  // Chi-squared test
+  const chiSquared = positionWinCounts.reduce((sum, count) => {
+    return sum + Math.pow(count - expectedWins, 2) / expectedWins;
+  }, 0);
+
+  console.log(`Chi-squared statistic: ${chiSquared.toFixed(2)}`);
+  console.log(`Degrees of freedom: ${participantCount - 1}`);
+
+  const criticalValue = 18.31; // 95% confidence, 10 df
+  const isUniform = chiSquared < criticalValue;
+
+  console.log(`\n${isUniform ? '✅' : '❌'} Positional distribution is ${isUniform ? 'UNIFORM - NO BIAS' : 'NOT UNIFORM - BIAS DETECTED'} (95% confidence)`);
+  console.log(`   (Chi-squared ${chiSquared.toFixed(2)} ${isUniform ? '<' : '>'} critical value ${criticalValue})`);
+
+  if (isUniform) {
+    console.log('\n✅ VERDICT: The shuffle + random selection does NOT favor any position.');
+    console.log('   Each position in the original array has equal probability of winning.');
+  } else {
+    console.log('\n❌ WARNING: Positional bias detected! Earlier or later positions may be favored.');
+  }
+
+  console.log('\n' + '═'.repeat(70) + '\n');
+}
+
 // Run all tests
 runAllTests();
+
+// Run positional bias test
+testPositionalBias();
