@@ -61,12 +61,28 @@ A4: bob.johnson@email.com    B4: Bob Johnson       C4: 2025/03/26
    - C1: `Winner Email`
    - D1: `Participant Count`
    - E1: `Draw Conducted By`
+   - F1: `Paid Until`
+   - G1: `Paid Up`
+   - H1: `Prize Amount`
+   - I1: `Next Prize Amount`
 3. Format column A for date/time display:
    - Select column A
    - Go to **Format → Number → Date time**
    - This will display timestamps in human-readable format (e.g., "3/26/2025 14:30:00")
+4. Format column F for date display:
+   - Select column F
+   - Go to **Format → Number → Date**
+   - This will display the winner's "Paid Until" date at the time of the draw
 
 **Note:** This sheet serves as both the winners log and audit trail for all draw actions. It will be populated automatically by the script. You can leave it with just headers for now.
+
+**Rolling Prize System:**
+- All participants are eligible to win regardless of payment status
+- Prize starts at $50 CAD and increases by $50 each draw
+- If winner is paid up (Paid Until >= draw date): prize is awarded and resets to $50 for next draw
+- If winner is not paid up: prize rolls over to next draw (increases by $50)
+- "Paid Until" column preserves winner's payment status at time of draw for historical record
+- "Next Prize Amount" column shows what the following draw will be worth
 
 ## Step 3: Sheet Protection (Complete after script is installed)
 

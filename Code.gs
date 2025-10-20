@@ -56,6 +56,34 @@ function shuffle(array) {
 }
 
 /**
+ * Gets the prize amount for the current draw based on previous draw results
+ * @return {Object} Object with currentPrize and nextPrize amounts
+ */
+function calculatePrize() {
+  const winnersSheet = getWinnersSheet();
+  const lastRow = winnersSheet.getLastRow();
+
+  // If no previous draws or only header row, start at $50
+  if (lastRow < 2) {
+    return { currentPrize: 50 };
+  }
+
+  // Get the last draw's data
+  // Columns: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By,
+  //          Paid Until, Paid Up, Prize Amount, Next Prize Amount
+  const lastDrawRange = winnersSheet.getRange(lastRow, 1, 1, 9);
+  const lastDraw = lastDrawRange.getValues()[0];
+  const lastNextPrize = lastDraw[8]; // Column I: Next Prize Amount
+
+  // Current draw uses the "Next Prize Amount" from previous draw
+  const currentPrize = lastNextPrize;
+
+  // We'll calculate nextPrize after we know if current winner is paid up
+  // For now, return currentPrize (nextPrize will be set in logWinner)
+  return { currentPrize: currentPrize };
+}
+
+/**
  * Conducts the 50/50 draw from eligible participants
  * Triggered from custom menu
  */
@@ -78,32 +106,47 @@ function conductDraw() {
     const dataRange = participantsSheet.getRange(2, 1, lastRow - 1, 3);
     const participants = dataRange.getValues();
 
-    // Filter to eligible participants (Paid Until >= today)
+    // All participants are eligible (no payment status filtering)
+    // Check for rows with missing required data
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset to start of day for comparison
 
-    const eligibleParticipants = participants.filter(function(row) {
+    const incompleteRows = [];
+    const eligibleParticipants = [];
+
+    participants.forEach(function(row, index) {
       const email = row[0];
       const name = row[1];
       const paidUntil = row[2];
+      const rowNumber = index + 2; // +2 because index is 0-based and we skip header row
 
-      // Skip rows with missing required data
+      // Check for missing required data
       if (!email || !name || !paidUntil) {
-        return false;
+        const missing = [];
+        if (!email) missing.push('Email');
+        if (!name) missing.push('Name');
+        if (!paidUntil) missing.push('Paid Until');
+        incompleteRows.push('Row ' + rowNumber + ': Missing ' + missing.join(', '));
+      } else {
+        eligibleParticipants.push(row);
       }
-
-      // Check if Paid Until date is today or in the future
-      const paidUntilDate = new Date(paidUntil);
-      paidUntilDate.setHours(0, 0, 0, 0);
-
-      return paidUntilDate >= today;
     });
+
+    // If there are incomplete rows, alert user and abort draw
+    if (incompleteRows.length > 0) {
+      ui.alert(
+        'Cannot Conduct Draw - Incomplete Data',
+        'The following participants have missing required data:\n\n' + incompleteRows.join('\n') + '\n\nPlease complete all participant data before conducting a draw.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
 
     // Validate that we have eligible participants
     if (eligibleParticipants.length === 0) {
       ui.alert(
-        'No Eligible Participants',
-        'There are no participants with valid "Paid Until" dates (today or future).',
+        'No Participants',
+        'There are no participants in the Participants sheet.',
         ui.ButtonSet.OK
       );
       return;
@@ -117,14 +160,28 @@ function conductDraw() {
     const winner = shuffledParticipants[randomIndex];
     const winnerEmail = winner[0];
     const winnerName = winner[1];
+    const winnerPaidUntil = winner[2];
 
-    // Log the winner
-    logWinner(winnerEmail, winnerName, eligibleParticipants.length);
+    // Check if winner is paid up
+    const winnerPaidUntilDate = new Date(winnerPaidUntil);
+    winnerPaidUntilDate.setHours(0, 0, 0, 0);
+    const isPaidUp = winnerPaidUntilDate >= today;
 
-    // Display winner to user
+    // Calculate prize amounts
+    const prizeInfo = calculatePrize();
+    const currentPrize = prizeInfo.currentPrize;
+
+    // Log the winner with prize and payment status
+    logWinner(winnerEmail, winnerName, winnerPaidUntil, isPaidUp, currentPrize, eligibleParticipants.length);
+
+    // Display winner to user with appropriate message
+    const prizeStatus = isPaidUp
+      ? 'PRIZE AWARDED: $' + currentPrize + ' CAD\nNext draw: $50 CAD'
+      : 'NOT PAID UP - Prize rolls over\nNext draw: $' + (currentPrize + 50) + ' CAD';
+
     ui.alert(
       '50/50 Draw Winner',
-      'Winner: ' + winnerName + '\nEmail: ' + winnerEmail + '\n\nEligible Participants: ' + eligibleParticipants.length,
+      'Winner: ' + winnerName + '\nEmail: ' + winnerEmail + '\n\n' + prizeStatus + '\n\nTotal Participants: ' + eligibleParticipants.length,
       ui.ButtonSet.OK
     );
 
@@ -138,24 +195,35 @@ function conductDraw() {
  * Logs the draw winner to the Winners sheet
  * @param {string} winnerEmail - Winner's email address
  * @param {string} winnerName - Winner's name
+ * @param {Date} winnerPaidUntil - Winner's "Paid Until" date at time of draw
+ * @param {boolean} isPaidUp - Whether winner is paid up
+ * @param {number} currentPrize - Prize amount for this draw
  * @param {number} participantCount - Number of eligible participants
  */
-function logWinner(winnerEmail, winnerName, participantCount) {
+function logWinner(winnerEmail, winnerName, winnerPaidUntil, isPaidUp, currentPrize, participantCount) {
   try {
     const winnersSheet = getWinnersSheet();
     const timestamp = new Date();
     const conductedBy = Session.getActiveUser().getEmail();
 
-    // Append row: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By
+    // Calculate next prize amount
+    const nextPrize = isPaidUp ? 50 : currentPrize + 50;
+
+    // Append row: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By,
+    //             Paid Until, Paid Up, Prize Amount, Next Prize Amount
     winnersSheet.appendRow([
       timestamp,
       winnerName,
       winnerEmail,
       participantCount,
-      conductedBy
+      conductedBy,
+      winnerPaidUntil,
+      isPaidUp ? 'Yes' : 'No',
+      currentPrize,
+      nextPrize
     ]);
 
-    Logger.log('Winner logged: ' + winnerName + ' (' + winnerEmail + ')');
+    Logger.log('Winner logged: ' + winnerName + ' (' + winnerEmail + ') - Prize: $' + currentPrize + ' - Paid Up: ' + isPaidUp);
 
   } catch (error) {
     throw new Error('Failed to log winner: ' + error.message);
