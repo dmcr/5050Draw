@@ -34,13 +34,13 @@ The Google Sheets workbook will contain two sheets:
    - Changes audited via Google Sheets built-in version history
 
 2. **Winners Sheet**
-   - Columns: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By, Paid Until, Paid Up, Prize Amount, Next Prize Amount
+   - Columns: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By, Paid Until, Paid Up, Prize Amount, Carry-over Amount
    - Serves as both winners log and audit trail for draw actions
    - Timestamp formatted as human-readable date/time
    - Paid Until preserves winner's payment status at time of draw (historical record)
    - Paid Up shows Yes/No based on whether Paid Until >= draw date
-   - Prize Amount shows current draw prize ($50, $100, $150, etc.)
-   - Next Prize Amount shows what next draw will be worth (for easy reference)
+   - Prize Amount shows current draw prize (paid-up count + carry-over)
+   - Carry-over Amount shows amount carried forward to next draw ($0 if winner paid up, prize amount if not)
    - Protected (read-only except via script)
 
 ### Security & Permissions
@@ -73,10 +73,10 @@ The Google Sheets workbook will contain two sheets:
 
 ## Prize System
 - All participants eligible to win regardless of payment status
-- Prize starts at $50 CAD
-- If winner is paid up: prize awarded, resets to $50 for next draw
-- If winner is not paid up: prize rolls over, increases by $50 for next draw
-- Winners sheet tracks both current prize and next prize amount
+- Prize = Number of paid-up participants (at time of draw) + carry-over amount
+- If winner is paid up: prize awarded, carry-over resets to $0 for next draw
+- If winner is not paid up: prize rolls over, entire prize becomes carry-over for next draw
+- Winners sheet tracks both current prize amount and carry-over amount
 - Winner's "Paid Until" date preserved in Winners sheet as historical record
 
 ## Implementation Details
@@ -88,10 +88,10 @@ The Google Sheets workbook will contain two sheets:
 
 ### Code Structure (Code.gs)
 - `onOpen()`: Creates custom menu on spreadsheet open
-- `conductDraw()`: Main draw logic (includes all participants, checks payment status, calculates prizes)
-- `calculatePrize()`: Determines current prize based on previous draw results
+- `conductDraw()`: Main draw logic (includes all participants, counts paid-up participants, checks winner payment status, calculates prizes)
+- `getCarryover()`: Returns carry-over amount from previous draw
 - `shuffle()`: Fisher-Yates array shuffling
-- `logWinner()`: Appends draw results to Winners sheet with prize and payment data
+- `logWinner()`: Appends draw results to Winners sheet with prize and carry-over data
 - `getParticipantsSheet()`, `getWinnersSheet()`: Helper functions with error handling
 
 ## Status

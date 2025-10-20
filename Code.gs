@@ -56,31 +56,26 @@ function shuffle(array) {
 }
 
 /**
- * Gets the prize amount for the current draw based on previous draw results
- * @return {Object} Object with currentPrize and nextPrize amounts
+ * Gets the carry-over amount from the previous draw
+ * @return {number} Carry-over amount from previous draw (0 if no previous draws)
  */
-function calculatePrize() {
+function getCarryover() {
   const winnersSheet = getWinnersSheet();
   const lastRow = winnersSheet.getLastRow();
 
-  // If no previous draws or only header row, start at $50
+  // If no previous draws or only header row, no carry-over
   if (lastRow < 2) {
-    return { currentPrize: 50 };
+    return 0;
   }
 
   // Get the last draw's data
   // Columns: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By,
-  //          Paid Until, Paid Up, Prize Amount, Next Prize Amount
+  //          Paid Until, Paid Up, Prize Amount, Carry-over Amount
   const lastDrawRange = winnersSheet.getRange(lastRow, 1, 1, 9);
   const lastDraw = lastDrawRange.getValues()[0];
-  const lastNextPrize = lastDraw[8]; // Column I: Next Prize Amount
+  const carryover = lastDraw[8]; // Column I: Carry-over Amount
 
-  // Current draw uses the "Next Prize Amount" from previous draw
-  const currentPrize = lastNextPrize;
-
-  // We'll calculate nextPrize after we know if current winner is paid up
-  // For now, return currentPrize (nextPrize will be set in logWinner)
-  return { currentPrize: currentPrize };
+  return carryover;
 }
 
 /**
@@ -152,6 +147,17 @@ function conductDraw() {
       return;
     }
 
+    // Count paid-up participants for prize calculation
+    let paidUpCount = 0;
+    eligibleParticipants.forEach(function(row) {
+      const paidUntil = row[2];
+      const paidUntilDate = new Date(paidUntil);
+      paidUntilDate.setHours(0, 0, 0, 0);
+      if (paidUntilDate >= today) {
+        paidUpCount++;
+      }
+    });
+
     // Shuffle eligible participants to eliminate any position bias
     const shuffledParticipants = shuffle(eligibleParticipants);
 
@@ -168,20 +174,23 @@ function conductDraw() {
     const isPaidUp = winnerPaidUntilDate >= today;
 
     // Calculate prize amounts
-    const prizeInfo = calculatePrize();
-    const currentPrize = prizeInfo.currentPrize;
+    const carryover = getCarryover();
+    const currentPrize = paidUpCount + carryover;
 
     // Log the winner with prize and payment status
     logWinner(winnerEmail, winnerName, winnerPaidUntil, isPaidUp, currentPrize, eligibleParticipants.length);
 
     // Display winner to user with appropriate message
+    const prizeBreakdown = paidUpCount + ' paid-up participants = $' + paidUpCount +
+                           (carryover > 0 ? ' + $' + carryover + ' carry-over' : '') +
+                           ' = $' + currentPrize + ' CAD';
     const prizeStatus = isPaidUp
-      ? 'PRIZE AWARDED: $' + currentPrize + ' CAD\nNext draw: $50 CAD'
-      : 'NOT PAID UP - Prize rolls over\nNext draw: $' + (currentPrize + 50) + ' CAD';
+      ? 'PRIZE AWARDED: $' + currentPrize + ' CAD\nNext draw carry-over: $0'
+      : 'NOT PAID UP - Prize rolls over\nNext draw carry-over: $' + currentPrize;
 
     ui.alert(
       '50/50 Draw Winner',
-      'Winner: ' + winnerName + '\nEmail: ' + winnerEmail + '\n\n' + prizeStatus + '\n\nTotal Participants: ' + eligibleParticipants.length,
+      'Winner: ' + winnerName + '\nEmail: ' + winnerEmail + '\n\n' + prizeBreakdown + '\n\n' + prizeStatus + '\n\nTotal Participants: ' + eligibleParticipants.length,
       ui.ButtonSet.OK
     );
 
@@ -206,11 +215,11 @@ function logWinner(winnerEmail, winnerName, winnerPaidUntil, isPaidUp, currentPr
     const timestamp = new Date();
     const conductedBy = Session.getActiveUser().getEmail();
 
-    // Calculate next prize amount
-    const nextPrize = isPaidUp ? 50 : currentPrize + 50;
+    // Calculate carry-over amount for next draw
+    const carryover = isPaidUp ? 0 : currentPrize;
 
     // Append row: Timestamp, Winner Name, Winner Email, Participant Count, Draw Conducted By,
-    //             Paid Until, Paid Up, Prize Amount, Next Prize Amount
+    //             Paid Until, Paid Up, Prize Amount, Carry-over Amount
     winnersSheet.appendRow([
       timestamp,
       winnerName,
@@ -220,7 +229,7 @@ function logWinner(winnerEmail, winnerName, winnerPaidUntil, isPaidUp, currentPr
       winnerPaidUntil,
       isPaidUp ? 'Yes' : 'No',
       currentPrize,
-      nextPrize
+      carryover
     ]);
 
     Logger.log('Winner logged: ' + winnerName + ' (' + winnerEmail + ') - Prize: $' + currentPrize + ' - Paid Up: ' + isPaidUp);
