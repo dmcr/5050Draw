@@ -10,7 +10,7 @@
  */
 
 /**
- * Fisher-Yates shuffle - EXACT COPY from Code.gs:49-56
+ * Fisher-Yates shuffle - EXACT COPY of shuffle() in Code.gs
  */
 function shuffle(array) {
   const shuffled = array.slice(); // Create a copy to avoid modifying original
@@ -22,7 +22,7 @@ function shuffle(array) {
 }
 
 /**
- * Simulates the draw selection process - EXACT COPY from Code.gs:155-160
+ * Simulates the draw selection process - EXACT COPY of the selection in conductDraw() in Code.gs
  * (This is the core randomization logic from conductDraw function)
  */
 function conductSimulatedDraw(eligibleParticipants) {

@@ -1,0 +1,12 @@
+# Membership and payment lists: sensitive personal data, never commit.
+private-data/
+
+# Belt and braces: no spreadsheet or export files anywhere in this repo.
+*.xls
+*.xlsx
+*.xlsm
+*.csv
+*.tsv
+*.numbers
+
+.DS_Store

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>50/50 Payment</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, system-ui, sans-serif; font-size: 18px; margin: 0; padding: 16px; max-width: 640px; margin: 0 auto; color: #222; background: #fff; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    input { font-size: 20px; width: 100%; padding: 14px; border: 1px solid #999; border-radius: 10px; }
+    #pinBox { background: #fff3cd; padding: 12px; border-radius: 10px; margin-bottom: 12px; }
+    #pinBox input { width: 8em; display: inline-block; margin-right: 8px; }
+    #names { list-style: none; padding: 0; margin: 8px 0 16px; max-height: 38vh; overflow-y: auto; border: 1px solid #ddd; border-radius: 10px; }
+    #names li { padding: 14px; border-bottom: 1px solid #eee; cursor: pointer; }
+    #names li:last-child { border-bottom: 0; }
+    #names li.sel { background: #d9ead3; font-weight: bold; }
+    #names li.hint { color: #777; cursor: default; }
+    #names li span { float: right; color: #555; }
+    #names li span.zero { color: #b00; font-weight: bold; }
+    .label { font-weight: bold; margin: 8px 0 4px; }
+    .draws { display: flex; align-items: center; gap: 10px; }
+    .draws button { width: 64px; height: 64px; font-size: 28px; border-radius: 10px; border: 1px solid #999; background: #fff; }
+    .draws input { width: 110px; height: 64px; text-align: center; font-size: 26px; }
+    button.big { width: 100%; padding: 18px; margin-top: 12px; font-size: 20px; border-radius: 10px; border: 0; background: #1a73e8; color: #fff; }
+    button.big:disabled { background: #bbb; }
+    button.big.confirm { background: #188038; }
+    #msg { margin-top: 14px; padding: 14px; border-radius: 10px; display: none; white-space: pre-wrap; }
+    #msg.ok { display: block; background: #d9ead3; }
+    #msg.err { display: block; background: #f4cccc; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <h1>50/50 Payment</h1>
+
+  <div id="pinBox" hidden>
+    Enter the bar PIN: <input id="pin" inputmode="numeric" autocomplete="off">
+    <button class="big" style="width:auto;margin:0;padding:12px 18px" onclick="savePin()">OK</button>
+  </div>
+
+  <div id="main" hidden>
+    <div class="label">Who paid? (number shows draws remaining)</div>
+    <input id="search" placeholder="Type part of a name…" autocomplete="off" autocorrect="off" autocapitalize="off">
+    <ul id="names"></ul>
+
+    <div class="label">How many draws? (100 = season)</div>
+    <div class="draws">
+      <button id="minus">−</button>
+      <input id="draws" type="number" inputmode="numeric" min="1" max="100" value="1">
+      <button id="plus">+</button>
+    </div>
+
+    <button class="big" id="submit" disabled>Record payment</button>
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    var MAX_DRAWS = 100; // must match MAX_DRAWS_PER_PAYMENT in Code.gs
+    var names = [];
+    var selected = null;
+    var armed = false;
+    var PIN_KEY = 'bar5050pin';
+
+    function getPin() { try { return localStorage.getItem(PIN_KEY) || ''; } catch (e) { return ''; } }
+    function savePin() {
+      try { localStorage.setItem(PIN_KEY, document.getElementById('pin').value.trim()); } catch (e) {}
+      document.getElementById('pinBox').hidden = true;
+      loadNames();
+    }
+
+    function loadNames() {
+      google.script.run
+        .withSuccessHandler(function(list) {
+          names = list;
+          document.getElementById('main').hidden = false;
+          renderNames();
+        })
+        .withFailureHandler(fail)
+        .webListNames(getPin());
+    }
+
+    function fail(err) {
+      var text = (err && err.message) ? err.message : String(err);
+      if (text.indexOf('PIN_REQUIRED') !== -1) {
+        document.getElementById('pinBox').hidden = false;
+        document.getElementById('pin').value = '';
+        document.getElementById('pin').focus();
+        return;
+      }
+      showMsg(text.replace(/^Error:\s*/, ''), 'err');
+      disarm();
+    }
+
+    function renderNames() {
+      var q = document.getElementById('search').value.trim().toLowerCase();
+      var words = q ? q.split(/\s+/) : [];
+      var list = document.getElementById('names');
+      list.innerHTML = '';
+      var shown = 0;
+      for (var i = 0; i < names.length; i++) {
+        var n = names[i].name, lower = n.toLowerCase(), ok = true;
+        for (var w = 0; w < words.length; w++) { if (lower.indexOf(words[w]) === -1) { ok = false; break; } }
+        if (!ok) continue;
+        if (shown >= 40) { addHint(list, 'More matches… keep typing to narrow the list'); break; }
+        var li = document.createElement('li');
+        li.textContent = n;
+        var bal = document.createElement('span');
+        bal.textContent = names[i].draws;
+        if (names[i].draws === 0) bal.className = 'zero';
+        li.appendChild(bal);
+        if (n === selected) li.className = 'sel';
+        li.onclick = (function(name) { return function() { select(name); }; })(n);
+        list.appendChild(li);
+        shown++;
+      }
+      if (shown === 0) addHint(list, 'No one matches. Ask an admin to add them to the sheet.');
+    }
+
+    function addHint(list, text) {
+      var li = document.createElement('li');
+      li.className = 'hint';
+      li.textContent = text;
+      list.appendChild(li);
+    }
+
+    function select(name) {
+      selected = (selected === name) ? null : name;
+      disarm();
+      renderNames();
+      updateButton();
+    }
+
+    // Draws paid: whole number 1..MAX_DRAWS, or null if the box holds anything else
+    function getDraws() {
+      var n = Number(document.getElementById('draws').value);
+      return (n >= 1 && n <= MAX_DRAWS && n === Math.floor(n)) ? n : null;
+    }
+
+    function setDraws(n) {
+      document.getElementById('draws').value = Math.min(MAX_DRAWS, Math.max(1, n));
+      disarm();
+    }
+
+    function updateButton() {
+      var btn = document.getElementById('submit');
+      var draws = getDraws();
+      btn.disabled = !selected || !draws;
+      btn.className = 'big' + (armed ? ' confirm' : '');
+      var what = draws + ' draw' + (draws === 1 ? '' : 's') + ' for ' + selected;
+      btn.textContent = !selected ? 'Record payment'
+        : !draws ? 'Enter a number from 1 to ' + MAX_DRAWS
+        : armed ? 'Tap again to confirm: ' + what
+        : 'Record ' + what;
+    }
+
+    function disarm() { armed = false; updateButton(); }
+
+    function showMsg(text, cls) {
+      var m = document.getElementById('msg');
+      m.textContent = text;
+      m.className = cls;
+    }
+
+    document.getElementById('submit').onclick = function() {
+      if (!selected) return;
+      if (!armed) { armed = true; updateButton(); return; }
+      var name = selected, n = getDraws();
+      if (!n) return;
+      var btn = document.getElementById('submit');
+      btn.disabled = true;
+      btn.textContent = 'Recording…';
+      google.script.run
+        .withSuccessHandler(function(text) {
+          showMsg(text, 'ok');
+          selected = null; armed = false;
+          document.getElementById('search').value = '';
+          setDraws(1);
+          loadNames(); // re-read balances so the list shows the new figure
+        })
+        .withFailureHandler(function(err) { fail(err); updateButton(); })
+        .webRecordPayment(getPin(), name, n);
+    };
+
+    document.getElementById('search').addEventListener('input', renderNames);
+    document.getElementById('draws').addEventListener('input', disarm);
+    document.getElementById('minus').onclick = function() { setDraws((getDraws() || 1) - 1); };
+    document.getElementById('plus').onclick = function() { setDraws((getDraws() || 0) + 1); };
+    updateButton();
+    loadNames();
+  </script>
+</body>
+</html>
